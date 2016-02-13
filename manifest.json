@@ -9,10 +9,13 @@
   },
   "app": {
     "background": {
-      "scripts": ["js/main.js"]
+      "scripts": ["js/background.js"]
     }
   },
   "permissions": [
     "storage"
-  ]
+  ],
+  "sandbox": {
+    "pages": ["sandbox.html"]
+  }
 }

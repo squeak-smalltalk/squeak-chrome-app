@@ -196,14 +196,14 @@ function setupFullscreen(display, canvas, options) {
 
 function setupSwapButtons(options) {
     if (options.swapCheckbox) {
-        var imageName = chrome.storage.local["squeakImageName"] || "default",
-            settings = JSON.parse(chrome.storage.local["squeakSettings:" + imageName] || "{}");
+        var imageName = window.fake.localStorage["squeakImageName"] || "default",
+            settings = JSON.parse(window.fake.localStorage["squeakSettings:" + imageName] || "{}");
         if ("swapButtons" in settings) options.swapButtons = settings.swapButtons;
         options.swapCheckbox.checked = options.swapButtons;
         options.swapCheckbox.onclick = function() {
             options.swapButtons = options.swapCheckbox.checked;
             settings["swapButtons"] = options.swapButtons;
-            chrome.storage.local["squeakSettings:" + imageName] = JSON.stringify(settings);
+            window.fake.localStorage["squeakSettings:" + imageName] = JSON.stringify(settings);
         }
     }
 }
@@ -548,7 +548,7 @@ function createSqueakDisplay(canvas, options) {
         try {
             evt.clipboardData.setData("Text", display.clipboardString);
         } catch(err) {
-            console.log("copy error " + err);
+            alert("copy error " + err);
         }
         evt.preventDefault();
     };
@@ -563,7 +563,7 @@ function createSqueakDisplay(canvas, options) {
             // simulate paste event for Squeak
             fakeCmdOrCtrlKey('v'.charCodeAt(0), evt.timeStamp, display, eventQueue);
         } catch(err) {
-            console.log("paste error " + err);
+            alert("paste error " + err);
         }
         evt.preventDefault();
     };
@@ -721,9 +721,9 @@ function updateSpinner(spinner, idleMS, vm, display) {
 var loop; // holds timeout for main loop
 
 SqueakJS.runImage = function(buffer, name, display, options) {
-    // window.onbeforeunload = function() {
-    //     return SqueakJS.appName + " is still running";
-    // };
+    window.onbeforeunload = function() {
+        return SqueakJS.appName + " is still running";
+    };
     window.clearTimeout(loop);
     display.reset();
     display.clear();
@@ -736,7 +736,7 @@ SqueakJS.runImage = function(buffer, name, display, options) {
             display.quitFlag = false;
             var vm = new Squeak.Interpreter(image, display);
             SqueakJS.vm = vm;
-            chrome.storage.local["squeakImageName"] = name;
+            window.fake.localStorage["squeakImageName"] = name;
             setupSwapButtons(options);
             display.clear();
             display.showBanner("Starting " + SqueakJS.appName);
@@ -751,6 +751,7 @@ SqueakJS.runImage = function(buffer, name, display, options) {
                     });
                 } catch(error) {
                     console.error(error);
+                    alert(error);
                 }
             };
             display.runNow = function() {
@@ -865,7 +866,7 @@ SqueakJS.runSqueak = function(imageUrl, canvas, options) {
             else rq.onerror(rq.statusText);
         };
         rq.onerror = function(e) {
-            console.log("Failed to download:\n" + file.url);
+            alert("Failed to download:\n" + file.url);
         }
         rq.send();
     };
@@ -879,7 +880,7 @@ SqueakJS.quitSqueak = function() {
 };
 
 SqueakJS.onQuit = function(vm, display, options) {
-    // window.onbeforeunload = null;
+    window.onbeforeunload = null;
     display.vm = null;
     if (options.spinner) options.spinner.style.display = "none";
     if (options.onQuit) options.onQuit(vm, display, options);
