@@ -233,7 +233,7 @@ Object.extend(Squeak,
         if (!files) {
             // find existing files
             files = {};
-            for (var key in localStorage) {
+            for (var key in chrome.storage.local) {
                 var match = key.match(/squeak-file(\.lz)?:(.*)$/);
                 if (match) {files[match[2]] = true};
             }
@@ -261,7 +261,7 @@ Object.extend(Squeak,
             var path = dir + "/" + name,
                 isDir = entries[name][3];
             if (isDir) {
-                var exists = "squeak:" + path in localStorage;
+                var exists = "squeak:" + path in chrome.storage.local;
                 if (exists) {
                     Squeak.fsck(null, path, files, stats);
                     stats.dirs++;
@@ -294,8 +294,8 @@ Object.extend(Squeak,
             if (orphaned.length > 0) {
                 for (var i = 0; i < orphaned.length; i++) {
                     console.log("Deleting orphaned file " + orphaned[i]);
-                    delete localStorage["squeak-file:" + orphaned[i]];
-                    delete localStorage["squeak-file.lz:" + orphaned[i]];
+                    delete chrome.storage.local["squeak-file:" + orphaned[i]];
+                    delete chrome.storage.local["squeak-file.lz:" + orphaned[i]];
                     stats.deleted++;
                 }
                 if (typeof indexedDB !== "undefined") {
@@ -389,9 +389,9 @@ Object.extend(Squeak,
                 get: function(filename) {
                     var buffer = SqueakDBFake.bigFiles[filename];
                     if (!buffer) {
-                        var string = localStorage["squeak-file:" + filename];
+                        var string = chrome.storage.local["squeak-file:" + filename];
                         if (!string) {
-                            var compressed = localStorage["squeak-file.lz:" + filename];
+                            var compressed = chrome.storage.local["squeak-file.lz:" + filename];
                             if (compressed) {
                                 if (typeof LZString == "object") {
                                     string = LZString.decompressFromUTF16(compressed);
@@ -423,10 +423,10 @@ Object.extend(Squeak,
                         var string = Squeak.bytesAsString(new Uint8Array(buffer));
                         if (typeof LZString == "object") {
                             var compressed = LZString.compressToUTF16(string);
-                            localStorage["squeak-file.lz:" + filename] = compressed;
-                            delete localStorage["squeak-file:" + filename];
+                            chrome.storage.local["squeak-file.lz:" + filename] = compressed;
+                            delete chrome.storage.local["squeak-file:" + filename];
                         } else {
-                            localStorage["squeak-file:" + filename] = string;
+                            chrome.storage.local["squeak-file:" + filename] = string;
                         }
                     }
                     var req = {};
@@ -434,8 +434,8 @@ Object.extend(Squeak,
                     return req;
                 },
                 delete: function(filename) {
-                    delete localStorage["squeak-file:" + filename];
-                    delete localStorage["squeak-file.lz:" + filename];
+                    delete chrome.storage.local["squeak-file:" + filename];
+                    delete chrome.storage.local["squeak-file.lz:" + filename];
                     delete SqueakDBFake.bigFiles[filename];
                     var req = {};
                     setTimeout(function(){if (req.onsuccess) req.onsuccess()}, 0);
@@ -491,7 +491,7 @@ Object.extend(Squeak,
         // update directory entry
         entry[2] = now; // modification time
         entry[4] = contents.byteLength || contents.length || 0;
-        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        chrome.storage.local["squeak:" + path.dirname] = JSON.stringify(directory);
         // put file contents (async)
         this.dbTransaction("readwrite", "put " + filepath,
             function(fileStore) {
@@ -508,7 +508,7 @@ Object.extend(Squeak,
         var entry = directory[path.basename]; if (!entry || entry[3]) return false; // not found or is a directory
         // delete entry from directory
         delete directory[path.basename];
-        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        chrome.storage.local["squeak:" + path.dirname] = JSON.stringify(directory);
         if (entryOnly) return true;
         // delete file contents (async)
         this.dbTransaction("readwrite", "delete " + filepath, function(fileStore) {
@@ -527,8 +527,8 @@ Object.extend(Squeak,
         delete olddir[oldpath.basename];            // delete old entry
         entry[0] = newpath.basename;                // rename entry
         newdir[newpath.basename] = entry;           // add new entry
-        localStorage["squeak:" + newpath.dirname] = JSON.stringify(newdir);
-        if (!samedir) localStorage["squeak:" + oldpath.dirname] = JSON.stringify(olddir);
+        chrome.storage.local["squeak:" + newpath.dirname] = JSON.stringify(newdir);
+        if (!samedir) chrome.storage.local["squeak:" + oldpath.dirname] = JSON.stringify(olddir);
         // move file contents (async)
         this.fileGet(oldpath.fullname,
             function success(contents) {
@@ -550,14 +550,14 @@ Object.extend(Squeak,
     },
     dirCreate: function(dirpath, withParents) {
         var path = this.splitFilePath(dirpath); if (!path.basename) return false;
-        if (withParents && !localStorage["squeak:" + path.dirname]) Squeak.dirCreate(path.dirname, true);
+        if (withParents && !chrome.storage.local["squeak:" + path.dirname]) Squeak.dirCreate(path.dirname, true);
         var directory = this.dirList(path.dirname); if (!directory) return false;
         if (directory[path.basename]) return false;
         var now = this.totalSeconds(),
             entry = [/*name*/ path.basename, /*ctime*/ now, /*mtime*/ now, /*dir*/ true, /*size*/ 0];
         directory[path.basename] = entry;
-        localStorage["squeak:" + path.fullname] = JSON.stringify({});
-        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        chrome.storage.local["squeak:" + path.fullname] = JSON.stringify({});
+        chrome.storage.local["squeak:" + path.dirname] = JSON.stringify(directory);
         return true;
     },
     dirDelete: function(dirpath) {
@@ -569,16 +569,16 @@ Object.extend(Squeak,
         for (var child in children) return false; // not empty
         // delete from parent
         delete directory[path.basename];
-        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        chrome.storage.local["squeak:" + path.dirname] = JSON.stringify(directory);
         // delete itself
-        delete localStorage["squeak:" + path.fullname];
+        delete chrome.storage.local["squeak:" + path.fullname];
         return true;
     },
     dirList: function(dirpath, includeTemplates) {
         // return directory entries or null
         var path = this.splitFilePath(dirpath),
-            localEntries = localStorage["squeak:" + path.fullname],
-            template = includeTemplates && localStorage["squeak-template:" + path.fullname];
+            localEntries = chrome.storage.local["squeak:" + path.fullname],
+            template = includeTemplates && chrome.storage.local["squeak-template:" + path.fullname];
         function addEntries(dir, entries) {
             for (var key in entries) {
                 if (entries.hasOwnProperty(key)) {
@@ -638,20 +638,20 @@ Object.extend(Squeak,
         function ensureTemplateParent(template) {
             var path = Squeak.splitFilePath(template);
             if (path.dirname !== "/") ensureTemplateParent(path.dirname);
-            var template = JSON.parse(localStorage["squeak-template:" + path.dirname] || '{"entries": {}}');
+            var template = JSON.parse(chrome.storage.local["squeak-template:" + path.dirname] || '{"entries": {}}');
             if (!template.entries[path.basename]) {
                 var now = Squeak.totalSeconds();
                 template.entries[path.basename] = [path.basename, now, now, true, 0];
-                localStorage["squeak-template:" + path.dirname] = JSON.stringify(template);
+                chrome.storage.local["squeak-template:" + path.dirname] = JSON.stringify(template);
             }
         }
         function checkSubTemplates(path, url) {
-            var template = JSON.parse(localStorage["squeak-template:" + path]);
+            var template = JSON.parse(chrome.storage.local["squeak-template:" + path]);
             template.entries.forEach(function(entry) {
                 if (entry[3]) Squeak.fetchTemplateDir(path + "/" + entry[0], url + "/" + entry[0]);
             });
         }
-        if (localStorage["squeak-template:" + path]) {
+        if (chrome.storage.local["squeak-template:" + path]) {
             checkSubTemplates(path, url);
         } else  {
             var index = url + "/sqindex.json";
@@ -661,7 +661,7 @@ Object.extend(Squeak,
                 if (rq.status == 200) {
                     console.log("adding template " + path);
                     ensureTemplateParent(path);
-                    localStorage["squeak-template:" + path] = '{"url": ' + JSON.stringify(url) + ', "entries": ' + rq.response + '}';
+                    chrome.storage.local["squeak-template:" + path] = '{"url": ' + JSON.stringify(url) + ', "entries": ' + rq.response + '}';
                     checkSubTemplates(path, url);
                 }
                 else rq.onerror(rq.statusText);
@@ -674,7 +674,7 @@ Object.extend(Squeak,
     },
     fetchTemplateFile: function(path, ifFound, ifNotFound) {
         path = Squeak.splitFilePath(path);
-        var template = localStorage["squeak-template:" + path.dirname];
+        var template = chrome.storage.local["squeak-template:" + path.dirname];
         if (!template) return ifNotFound();
         var url = JSON.parse(template).url;
         if (!url) return ifNotFound();
@@ -4872,7 +4872,7 @@ Object.subclass('Squeak.Primitives',
         if (argCount == 0)
             return this.popNandPushIfOK(1, this.makeStString(this.filenameToSqueak(this.vm.image.name)));
         this.vm.image.name = this.filenameFromSqueak(this.vm.top().bytesAsString());
-        window.localStorage['squeakImageName'] = this.vm.image.name;
+        chrome.storage.local['squeakImageName'] = this.vm.image.name;
         return true;
     },
     primitiveSnapshot: function(argCount) {
@@ -5965,7 +5965,7 @@ Object.subclass('Squeak.Primitives',
         if (/^\/SqueakJS\//.test(url)) {
             url = url.slice(10);     // remove file root
             var path = Squeak.splitFilePath(url),
-                template = localStorage["squeak-template:" + path.dirname];
+                template = chrome.storage.local["squeak-template:" + path.dirname];
             if (template) url = JSON.parse(template).url + "/" + path.basename;
         }
         window.open(url, "_blank"); // likely blocked as pop-up, but what can we do?

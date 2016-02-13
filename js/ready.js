@@ -1,78 +1,33 @@
-function runSqueak(imageName) {
-    sqText.style.display = "none";
-    sqCanvas.style.display = "block";
-    SqueakJS.runSqueak(imageName, sqCanvas, {
-        fullscreen: true,
-        spinner: sqSpinner,
-        appName: imageName && imageName.replace(/\.image$/, ""),
-    });
-}
-
-function exportFile(a) {
-    var path = Squeak.splitFilePath(a.innerText);
-    Squeak.fileGet(path.fullname, function(buffer) {
-        var blob = new Blob([buffer], {type: 'application/octet-stream'}),
-            blobURL = URL.createObjectURL(blob);
-        a.setAttribute('href', blobURL);
-        a.setAttribute('download', path.basename);
-        a.onclick = function(){
-            setTimeout(function(){URL.revokeObjectURL(blobURL);}, 0);
-            return true;
-        };
-        a.click();
-    }, alert);
-    return false;
-}
+IMAGE_BASE_URL = 'http://freudenbergs.de/bert/squeakjs/';
 
 window.onload = function() {
-    // if we have a hash then we just run Squeak with the options provided in the url
-    if (location.hash) {
-        return runSqueak();
-    }
-    document.body.ondragover = function(evt) {
-        evt.preventDefault();
-        if (evt.dataTransfer.items[0].kind == "file") {
-            evt.dataTransfer.dropEffect = "copy";
-            drop.style.borderColor = "#0E0";
-        } else {
-            evt.dataTransfer.dropEffect = "none";
-        }
-        return false;
-    };
-    document.body.ondragleave = function(evt) {
-        drop.style.borderColor = "";
-    };
-    document.body.ondrop = function(evt) {
-        evt.preventDefault();
-        drop.style.borderColor = "#080";
-        var files = [].slice.call(evt.dataTransfer.files),
-            todo = files.length,
-            imageName = null;
-        files.forEach(function(f) {
-            var reader = new FileReader();
-            reader.onload = function () {
-                var buffer = this.result;
-                console.log("Storing " + f.name + " (" + buffer.byteLength + " bytes)");
-                if (/.*image$/.test(f.name)) imageName = f.name;
-                Squeak.filePut(f.name, buffer, function success() {
-                    if (--todo > 0) return;
-                    drop.style.borderColor = "";
-                    if (!imageName) showFiles();
-                    else runSqueak(imageName);
-                });
-            };
-            reader.onerror = function() { alert("Failed to read " + f.name); };
-            reader.readAsArrayBuffer(f);
+    var squeakImages = document.getElementsByClassName('squeak-image');
+    for (var i = 0; i < squeakImages.length; i++) {
+        squeakImages[i].addEventListener('click', function(e) {
+            var files = this.getAttribute('data-files').split(',');
+            var imageName = files[0];
+            sqWelcome.style.display = "none";
+            sqCanvas.style.display = "block";
+            SqueakJS.runSqueak(IMAGE_BASE_URL + imageName, sqCanvas, {
+                appName: imageName && imageName.replace(/\.image$/, ""),
+                files: files,
+                fullscreen: true,
+                swapButtons: true,
+                spinner: sqSpinner,
+                onQuit: function(vm, display, options) {
+                    display.vm = null;
+                    display.showBanner("Exiting...");
+                    setTimeout(function() {
+                        sqWelcome.style.display = "block";
+                        sqCanvas.style.display = "none";
+                        document.body.style = '';
+                        if (display.cursorCanvas.parentNode != null) {
+                            display.cursorCanvas.parentNode.removeChild(display.cursorCanvas);
+                        }
+                    }, 1000);
+                }
+            });
         });
-        return false;
-    };
-
-    var imageUrl = chrome.runtime.getURL('images/Squeak1.13u.image');
-    debugger;
-    SqueakJS.runSqueak(imageUrl, sqCanvas, {
-        files: ["Squeak1.13u.image", "Squeak1.13u.changes", "SqueakV1.sources"],
-        fullscreen: true,
-        spinner: sqSpinner,
-        appName: 'Foo',
-    });
+    }
+    
 };
