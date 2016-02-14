@@ -25,6 +25,17 @@ module('users.bert.SqueakJS.vm').requires().toRun(function() {
 // shorter name for convenience
 window.Squeak = users.bert.SqueakJS.vm;
 
+// if in private mode set localStorage to a regular dict
+var localStorage = window.localStorage;
+try {
+  localStorage["squeak-foo:"] = "bar";
+  if (localStorage["squeak-foo:"] !== "bar") throw Error();
+  delete localStorage["squeak-foo:"];
+} catch(e) {
+  console.warn("localStorage not available, faking");
+  localStorage = {};
+}
+
 Object.extend(Squeak,
 "version", {
     // system attributes
@@ -233,7 +244,7 @@ Object.extend(Squeak,
         if (!files) {
             // find existing files
             files = {};
-            for (var key in window.fake.localStorage) {
+            for (var key in localStorage) {
                 var match = key.match(/squeak-file(\.lz)?:(.*)$/);
                 if (match) {files[match[2]] = true};
             }
@@ -261,7 +272,7 @@ Object.extend(Squeak,
             var path = dir + "/" + name,
                 isDir = entries[name][3];
             if (isDir) {
-                var exists = "squeak:" + path in window.fake.localStorage;
+                var exists = "squeak:" + path in localStorage;
                 if (exists) {
                     Squeak.fsck(null, path, files, stats);
                     stats.dirs++;
@@ -294,8 +305,8 @@ Object.extend(Squeak,
             if (orphaned.length > 0) {
                 for (var i = 0; i < orphaned.length; i++) {
                     console.log("Deleting orphaned file " + orphaned[i]);
-                    delete window.fake.localStorage["squeak-file:" + orphaned[i]];
-                    delete window.fake.localStorage["squeak-file.lz:" + orphaned[i]];
+                    delete localStorage["squeak-file:" + orphaned[i]];
+                    delete localStorage["squeak-file.lz:" + orphaned[i]];
                     stats.deleted++;
                 }
                 if (typeof indexedDB !== "undefined") {
@@ -339,11 +350,7 @@ Object.extend(Squeak,
         if (window.SqueakDB) return startTransaction();
 
         // otherwise, open SqueakDB first
-        try {
-            var openReq = indexedDB.open("squeak");
-        } catch(e) {
-            return fakeTransaction();
-        }
+        var openReq = indexedDB.open("squeak");
         
         // UIWebView implements the interface but only returns null
         // https://stackoverflow.com/questions/27415998/indexeddb-open-returns-null-on-safari-ios-8-1-1-and-halts-execution-on-cordova
@@ -377,7 +384,9 @@ Object.extend(Squeak,
         openReq.onblocked = function(e) {
             // If some other tab is loaded with the database, then it needs to be closed
             // before we can proceed upgrading the database.
-            alert("Database upgrade needed. Please close all other tabs with this site open!");
+            console.log("Database upgrade needed, but was blocked.");
+            console.warn("Falling back to local storage");
+            fakeTransaction();
         };
     },
     dbFake: function() {
@@ -393,9 +402,9 @@ Object.extend(Squeak,
                 get: function(filename) {
                     var buffer = SqueakDBFake.bigFiles[filename];
                     if (!buffer) {
-                        var string = window.fake.localStorage["squeak-file:" + filename];
+                        var string = localStorage["squeak-file:" + filename];
                         if (!string) {
-                            var compressed = window.fake.localStorage["squeak-file.lz:" + filename];
+                            var compressed = localStorage["squeak-file.lz:" + filename];
                             if (compressed) {
                                 if (typeof LZString == "object") {
                                     string = LZString.decompressFromUTF16(compressed);
@@ -427,10 +436,10 @@ Object.extend(Squeak,
                         var string = Squeak.bytesAsString(new Uint8Array(buffer));
                         if (typeof LZString == "object") {
                             var compressed = LZString.compressToUTF16(string);
-                            window.fake.localStorage["squeak-file.lz:" + filename] = compressed;
-                            delete window.fake.localStorage["squeak-file:" + filename];
+                            localStorage["squeak-file.lz:" + filename] = compressed;
+                            delete localStorage["squeak-file:" + filename];
                         } else {
-                            window.fake.localStorage["squeak-file:" + filename] = string;
+                            localStorage["squeak-file:" + filename] = string;
                         }
                     }
                     var req = {};
@@ -438,8 +447,8 @@ Object.extend(Squeak,
                     return req;
                 },
                 delete: function(filename) {
-                    delete window.fake.localStorage["squeak-file:" + filename];
-                    delete window.fake.localStorage["squeak-file.lz:" + filename];
+                    delete localStorage["squeak-file:" + filename];
+                    delete localStorage["squeak-file.lz:" + filename];
                     delete SqueakDBFake.bigFiles[filename];
                     var req = {};
                     setTimeout(function(){if (req.onsuccess) req.onsuccess()}, 0);
@@ -495,7 +504,7 @@ Object.extend(Squeak,
         // update directory entry
         entry[2] = now; // modification time
         entry[4] = contents.byteLength || contents.length || 0;
-        window.fake.localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
         // put file contents (async)
         this.dbTransaction("readwrite", "put " + filepath,
             function(fileStore) {
@@ -512,7 +521,7 @@ Object.extend(Squeak,
         var entry = directory[path.basename]; if (!entry || entry[3]) return false; // not found or is a directory
         // delete entry from directory
         delete directory[path.basename];
-        window.fake.localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
         if (entryOnly) return true;
         // delete file contents (async)
         this.dbTransaction("readwrite", "delete " + filepath, function(fileStore) {
@@ -531,8 +540,8 @@ Object.extend(Squeak,
         delete olddir[oldpath.basename];            // delete old entry
         entry[0] = newpath.basename;                // rename entry
         newdir[newpath.basename] = entry;           // add new entry
-        window.fake.localStorage["squeak:" + newpath.dirname] = JSON.stringify(newdir);
-        if (!samedir) window.fake.localStorage["squeak:" + oldpath.dirname] = JSON.stringify(olddir);
+        localStorage["squeak:" + newpath.dirname] = JSON.stringify(newdir);
+        if (!samedir) localStorage["squeak:" + oldpath.dirname] = JSON.stringify(olddir);
         // move file contents (async)
         this.fileGet(oldpath.fullname,
             function success(contents) {
@@ -554,14 +563,14 @@ Object.extend(Squeak,
     },
     dirCreate: function(dirpath, withParents) {
         var path = this.splitFilePath(dirpath); if (!path.basename) return false;
-        if (withParents && !window.fake.localStorage["squeak:" + path.dirname]) Squeak.dirCreate(path.dirname, true);
+        if (withParents && !localStorage["squeak:" + path.dirname]) Squeak.dirCreate(path.dirname, true);
         var directory = this.dirList(path.dirname); if (!directory) return false;
         if (directory[path.basename]) return false;
         var now = this.totalSeconds(),
             entry = [/*name*/ path.basename, /*ctime*/ now, /*mtime*/ now, /*dir*/ true, /*size*/ 0];
         directory[path.basename] = entry;
-        window.fake.localStorage["squeak:" + path.fullname] = JSON.stringify({});
-        window.fake.localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        localStorage["squeak:" + path.fullname] = JSON.stringify({});
+        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
         return true;
     },
     dirDelete: function(dirpath) {
@@ -573,16 +582,16 @@ Object.extend(Squeak,
         for (var child in children) return false; // not empty
         // delete from parent
         delete directory[path.basename];
-        window.fake.localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
+        localStorage["squeak:" + path.dirname] = JSON.stringify(directory);
         // delete itself
-        delete window.fake.localStorage["squeak:" + path.fullname];
+        delete localStorage["squeak:" + path.fullname];
         return true;
     },
     dirList: function(dirpath, includeTemplates) {
         // return directory entries or null
         var path = this.splitFilePath(dirpath),
-            localEntries = window.fake.localStorage["squeak:" + path.fullname],
-            template = includeTemplates && window.fake.localStorage["squeak-template:" + path.fullname];
+            localEntries = localStorage["squeak:" + path.fullname],
+            template = includeTemplates && localStorage["squeak-template:" + path.fullname];
         function addEntries(dir, entries) {
             for (var key in entries) {
                 if (entries.hasOwnProperty(key)) {
@@ -642,20 +651,20 @@ Object.extend(Squeak,
         function ensureTemplateParent(template) {
             var path = Squeak.splitFilePath(template);
             if (path.dirname !== "/") ensureTemplateParent(path.dirname);
-            var template = JSON.parse(window.fake.localStorage["squeak-template:" + path.dirname] || '{"entries": {}}');
+            var template = JSON.parse(localStorage["squeak-template:" + path.dirname] || '{"entries": {}}');
             if (!template.entries[path.basename]) {
                 var now = Squeak.totalSeconds();
                 template.entries[path.basename] = [path.basename, now, now, true, 0];
-                window.fake.localStorage["squeak-template:" + path.dirname] = JSON.stringify(template);
+                localStorage["squeak-template:" + path.dirname] = JSON.stringify(template);
             }
         }
         function checkSubTemplates(path, url) {
-            var template = JSON.parse(window.fake.localStorage["squeak-template:" + path]);
+            var template = JSON.parse(localStorage["squeak-template:" + path]);
             template.entries.forEach(function(entry) {
                 if (entry[3]) Squeak.fetchTemplateDir(path + "/" + entry[0], url + "/" + entry[0]);
             });
         }
-        if (window.fake.localStorage["squeak-template:" + path]) {
+        if (localStorage["squeak-template:" + path]) {
             checkSubTemplates(path, url);
         } else  {
             var index = url + "/sqindex.json";
@@ -665,7 +674,7 @@ Object.extend(Squeak,
                 if (rq.status == 200) {
                     console.log("adding template " + path);
                     ensureTemplateParent(path);
-                    window.fake.localStorage["squeak-template:" + path] = '{"url": ' + JSON.stringify(url) + ', "entries": ' + rq.response + '}';
+                    localStorage["squeak-template:" + path] = '{"url": ' + JSON.stringify(url) + ', "entries": ' + rq.response + '}';
                     checkSubTemplates(path, url);
                 }
                 else rq.onerror(rq.statusText);
@@ -678,7 +687,7 @@ Object.extend(Squeak,
     },
     fetchTemplateFile: function(path, ifFound, ifNotFound) {
         path = Squeak.splitFilePath(path);
-        var template = window.fake.localStorage["squeak-template:" + path.dirname];
+        var template = localStorage["squeak-template:" + path.dirname];
         if (!template) return ifNotFound();
         var url = JSON.parse(template).url;
         if (!url) return ifNotFound();
@@ -4876,7 +4885,7 @@ Object.subclass('Squeak.Primitives',
         if (argCount == 0)
             return this.popNandPushIfOK(1, this.makeStString(this.filenameToSqueak(this.vm.image.name)));
         this.vm.image.name = this.filenameFromSqueak(this.vm.top().bytesAsString());
-        window.fake.localStorage['squeakImageName'] = this.vm.image.name;
+        window.localStorage['squeakImageName'] = this.vm.image.name;
         return true;
     },
     primitiveSnapshot: function(argCount) {
@@ -5969,7 +5978,7 @@ Object.subclass('Squeak.Primitives',
         if (/^\/SqueakJS\//.test(url)) {
             url = url.slice(10);     // remove file root
             var path = Squeak.splitFilePath(url),
-                template = window.fake.localStorage["squeak-template:" + path.dirname];
+                template = localStorage["squeak-template:" + path.dirname];
             if (template) url = JSON.parse(template).url + "/" + path.basename;
         }
         window.open(url, "_blank"); // likely blocked as pop-up, but what can we do?

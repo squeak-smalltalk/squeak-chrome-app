@@ -123,6 +123,15 @@ Function.prototype.subclass = function(classPath /* + more args */ ) {
 
 module("SqueakJS").requires("users.bert.SqueakJS.vm").toRun(function() {
 
+// if in private mode set localStorage to a regular dict
+var localStorage = window.localStorage;
+try {
+  localStorage["squeak-foo:"] = "bar";
+  if (localStorage["squeak-foo:"] !== "bar") throw Error();
+  delete localStorage["squeak-foo:"];
+} catch(e) {
+  localStorage = {};
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // display & event setup
@@ -196,14 +205,14 @@ function setupFullscreen(display, canvas, options) {
 
 function setupSwapButtons(options) {
     if (options.swapCheckbox) {
-        var imageName = window.fake.localStorage["squeakImageName"] || "default",
-            settings = JSON.parse(window.fake.localStorage["squeakSettings:" + imageName] || "{}");
+        var imageName = localStorage["squeakImageName"] || "default",
+            settings = JSON.parse(localStorage["squeakSettings:" + imageName] || "{}");
         if ("swapButtons" in settings) options.swapButtons = settings.swapButtons;
         options.swapCheckbox.checked = options.swapButtons;
         options.swapCheckbox.onclick = function() {
             options.swapButtons = options.swapCheckbox.checked;
             settings["swapButtons"] = options.swapButtons;
-            window.fake.localStorage["squeakSettings:" + imageName] = JSON.stringify(settings);
+            localStorage["squeakSettings:" + imageName] = JSON.stringify(settings);
         }
     }
 }
@@ -220,11 +229,15 @@ function recordModifiers(evt, display) {
     return modifiers;
 }
 
+var canUseMouseOffset = navigator.userAgent.match("AppleWebKit/");
+
 function updateMousePos(evt, canvas, display) {
-    display.cursorCanvas.style.left = (evt.pageX + display.cursorOffsetX) + "px";
-    display.cursorCanvas.style.top = (evt.pageY + display.cursorOffsetY) + "px";
-    var x = ((evt.pageX - canvas.offsetLeft) * (canvas.width / canvas.offsetWidth)) | 0,
-        y = ((evt.pageY - canvas.offsetTop) * (canvas.height / canvas.offsetHeight)) | 0;
+    var evtX = canUseMouseOffset ? evt.offsetX : evt.layerX,
+        evtY = canUseMouseOffset ? evt.offsetY : evt.layerY;
+    display.cursorCanvas.style.left = (evtX + canvas.offsetLeft + display.cursorOffsetX) + "px";
+    display.cursorCanvas.style.top = (evtY + canvas.offsetTop + display.cursorOffsetY) + "px";
+    var x = (evtX * canvas.width / canvas.offsetWidth) | 0,
+        y = (evtY * canvas.height / canvas.offsetHeight) | 0;
     // clamp to display size
     display.mouseX = Math.max(0, Math.min(display.width, x));
     display.mouseY = Math.max(0, Math.min(display.height, y));
@@ -477,9 +490,7 @@ function createSqueakDisplay(canvas, options) {
     display.cursorCanvas.style.position = "absolute";
     display.cursorCanvas.style.cursor = "none";
     display.cursorCanvas.style.background = "transparent";
-    ['onmousedown', 'onmouseup', 'onmousemove', 'oncontextmenu',
-    'ontouchstart', 'ontouchmove', 'ontouchend', 'ontouchcancel'].
-        forEach(function(handler) { display.cursorCanvas[handler] = canvas[handler]; });
+    display.cursorCanvas.style.pointerEvents = "none";
     canvas.parentElement.appendChild(display.cursorCanvas);
     canvas.style.cursor = "none";
     // keyboard stuff
@@ -573,7 +584,7 @@ function createSqueakDisplay(canvas, options) {
             if (evt.dataTransfer.types[i] == 'Files') return true;
         return false;
     }
-    document.body.ondragover = function(evt) {
+    document.ondragover = function(evt) {
         evt.preventDefault();
         if (!dragEventHasFiles(evt))
             return evt.dataTransfer.dropEffect = 'none';
@@ -581,15 +592,15 @@ function createSqueakDisplay(canvas, options) {
         recordDragDropEvent(Squeak.EventDragMove, evt, canvas, display, eventQueue);
         return false;
     };
-    document.body.ondragenter = function(evt) {
+    document.ondragenter = function(evt) {
         if (!dragEventHasFiles(evt)) return;
         recordDragDropEvent(Squeak.EventDragEnter, evt, canvas, display, eventQueue);
     };
-    document.body.ondragleave = function(evt) {
+    document.ondragleave = function(evt) {
         if (!dragEventHasFiles(evt)) return;
         recordDragDropEvent(Squeak.EventDragLeave, evt, canvas, display, eventQueue);
     };
-    document.body.ondrop = function(evt) {
+    document.ondrop = function(evt) {
         evt.preventDefault();
         if (!dragEventHasFiles(evt)) return false;
         var files = [].slice.call(evt.dataTransfer.files),
@@ -721,8 +732,10 @@ function updateSpinner(spinner, idleMS, vm, display) {
 var loop; // holds timeout for main loop
 
 SqueakJS.runImage = function(buffer, name, display, options) {
-    window.onbeforeunload = function() {
-        return SqueakJS.appName + " is still running";
+    window.onbeforeunload = function(evt) {
+        var msg = SqueakJS.appName + " is still running";  
+        evt.returnValue = msg;
+        return msg;
     };
     window.clearTimeout(loop);
     display.reset();
@@ -736,7 +749,7 @@ SqueakJS.runImage = function(buffer, name, display, options) {
             display.quitFlag = false;
             var vm = new Squeak.Interpreter(image, display);
             SqueakJS.vm = vm;
-            window.fake.localStorage["squeakImageName"] = name;
+            localStorage["squeakImageName"] = name;
             setupSwapButtons(options);
             display.clear();
             display.showBanner("Starting " + SqueakJS.appName);
