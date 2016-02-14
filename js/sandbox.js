@@ -1,7 +1,10 @@
+delete window.localStorage;
+window.localStorage = {};
+delete window.indexedDB;
+
 var IMAGE_BASE_URL = 'http://freudenbergs.de/bert/squeakjs/';
 
 window.onload = function() {
-    window.fake = { localStorage: {} };
     window.addEventListener('message', function(event) {
         var files = event.data.split(',');
         var imageName = files[0];
