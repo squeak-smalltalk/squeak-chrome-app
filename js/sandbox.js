@@ -39,7 +39,7 @@ window.onload = function() {
                     display.vm = null;
                     display.showBanner("Exiting...");
                     setTimeout(function() {
-                        event.source.postMessage('exit', event.origin);
+                        event.source.postMessage({event: 'exit'}, event.origin);
                         var parentNode = display.cursorCanvas.parentNode;
                         if (parentNode !== null) {
                           parentNode.removeChild(display.cursorCanvas);
