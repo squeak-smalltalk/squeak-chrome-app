@@ -3,15 +3,33 @@ window.localStorage = {};
 delete window.indexedDB;
 
 var IMAGE_BASE_URL = 'http://freudenbergs.de/bert/squeakjs/';
+var SQUEAK_JS_DISPLAY = null;
 
 window.onload = function() {
     window.addEventListener('message', function(event) {
-        if (event.data.event !== undefined) {
-            dispatchClonedKeyboardEvent(event.data.event);
+        if (event.data.keyboardEvent !== undefined) {
+            dispatchClonedKeyboardEvent(event.data.keyboardEvent);
+        } else if (event.data.clipboard !== undefined) {
+            if (SQUEAK_JS_DISPLAY !== null) {
+                SQUEAK_JS_DISPLAY.display.executeClipboardPaste(
+                    event.data.clipboard,
+                    event.data.timeStamp
+                );
+            }
+        } else if (event.data.event == "copy") {
+            var text = SQUEAK_JS_DISPLAY.display.executeClipboardCopy(
+                event.data.key,
+                event.data.timeStamp
+            );
+            event.source.postMessage({
+                event: 'copy',
+                text: text,
+                timeStamp: event.data.timeStamp,
+            }, event.origin);
         } else if (event.data.files !== undefined) {
             var files = event.data.files.split(',');
             var imageName = files[0];
-            SqueakJS.runSqueak(IMAGE_BASE_URL + imageName, sqCanvas, {
+            SQUEAK_JS_DISPLAY = SqueakJS.runSqueak(IMAGE_BASE_URL + imageName, sqCanvas, {
                 appName: imageName && imageName.replace(/\.image$/, ""),
                 files: files,
                 fullscreen: true,

@@ -1,3 +1,4 @@
+var CLIPBOARD_BUFFER = null;
 window.onload = function() {
     window.squeakImages = document.getElementsByClassName('squeak-image');
     window.sandboxedFrame = document.getElementById('sqFrame');
@@ -7,13 +8,21 @@ window.onload = function() {
         squeakImages[i].addEventListener('click', selectionHandler);
     }
     window.addEventListener('message', function(event) {
-        sqWelcome.style.display = "block";
-    	sandboxedFrame.style.display = "none";
+        if (event.data.event == "exit") {
+            sqWelcome.style.display = "block";
+            sandboxedFrame.style.display = "none";
+        } else if (event.data.event == "copy") {
+            CLIPBOARD_BUFFER = event.data;
+            document.execCommand('copy');
+        }
     });
     var keyboardEventTypes = ['keydown', 'keyup', 'keypress'];
     for (i = 0; i < keyboardEventTypes.length; i++) {
         document.addEventListener(keyboardEventTypes[i], keyboardHandler);
     }
+    document.addEventListener('paste', clipboardPasteHandler);
+    document.addEventListener('copy', clipboardCopyHandler);
+    document.addEventListener('cut', clipboardCopyHandler);
 };
 
 function selectionHandler(e) {
@@ -24,7 +33,7 @@ function selectionHandler(e) {
 }
 
 function keyboardHandler(e) {
-    window.sandboxedWindow.postMessage({event: copyKeyboardEvent(e)}, '*');
+    window.sandboxedWindow.postMessage({keyboardEvent: copyKeyboardEvent(e)}, '*');
 }
 
 function copyKeyboardEvent(event) {
@@ -43,4 +52,30 @@ function copyKeyboardEvent(event) {
         type: event.type,
         which: event.which,
     };
+}
+
+function clipboardPasteHandler(e) {
+    try {
+        window.sandboxedWindow.postMessage({
+            clipboard: e.clipboardData.getData('Text'),
+            timeStamp: e.timeStamp,
+        }, '*');
+    } catch(err) {
+        console.log("paste error " + err);
+    }
+    e.preventDefault();
+}
+
+function clipboardCopyHandler(e) {
+    if (CLIPBOARD_BUFFER !== null) {
+        e.clipboardData.setData("Text", CLIPBOARD_BUFFER.text);
+        CLIPBOARD_BUFFER = null;
+    } else {
+        window.sandboxedWindow.postMessage({
+            event: 'copy',
+            key: (e.type == "copy" ? 'c' : 'x'),
+            timeStamp: e.timeStamp,
+        }, '*');
+    }
+    e.preventDefault();
 }
