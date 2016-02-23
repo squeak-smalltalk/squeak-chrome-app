@@ -11,13 +11,13 @@ window.onload = function() {
             dispatchClonedKeyboardEvent(event.data.keyboardEvent);
         } else if (event.data.clipboard !== undefined) {
             if (SQUEAK_JS_DISPLAY !== null) {
-                SQUEAK_JS_DISPLAY.display.executeClipboardPaste(
+                SQUEAK_JS_DISPLAY.executeClipboardPaste(
                     event.data.clipboard,
                     event.data.timeStamp
                 );
             }
         } else if (event.data.event == "copy") {
-            var text = SQUEAK_JS_DISPLAY.display.executeClipboardCopy(
+            var text = SQUEAK_JS_DISPLAY.executeClipboardCopy(
                 event.data.key,
                 event.data.timeStamp
             );
