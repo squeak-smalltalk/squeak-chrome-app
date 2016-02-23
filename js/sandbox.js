@@ -16,7 +16,7 @@ window.onload = function() {
                     event.data.timeStamp
                 );
             }
-        } else if (event.data.event == "copy") {
+        } else if (event.data.event == 'copy') {
             var text = SQUEAK_JS_DISPLAY.executeClipboardCopy(
                 event.data.key,
                 event.data.timeStamp
@@ -30,14 +30,14 @@ window.onload = function() {
             var files = event.data.files.split(',');
             var imageName = files[0];
             SQUEAK_JS_DISPLAY = SqueakJS.runSqueak(IMAGE_BASE_URL + imageName, sqCanvas, {
-                appName: imageName && imageName.replace(/\.image$/, ""),
+                appName: imageName && imageName.replace(/\.image$/, ''),
                 files: files,
                 fullscreen: true,
                 swapButtons: true,
                 spinner: sqSpinner,
                 onQuit: function(vm, display, options) {
                     display.vm = null;
-                    display.showBanner("Exiting...");
+                    display.showBanner('Exiting...');
                     setTimeout(function() {
                         event.source.postMessage({event: 'exit'}, event.origin);
                         var parentNode = display.cursorCanvas.parentNode;
@@ -52,7 +52,7 @@ window.onload = function() {
 };
 
 function dispatchClonedKeyboardEvent(event) {
-    var keyboardEvent = document.createEvent("KeyboardEvent");
+    var keyboardEvent = document.createEvent('KeyboardEvent');
     keyboardEvent.initKeyboardEvent(
         event.type,
         event.bubbles,
@@ -66,7 +66,7 @@ function dispatchClonedKeyboardEvent(event) {
         event.metaKey,
         false //event.altGraphKey
     );
-    var override_props = ["charCode", "code", "keyCode", "which"];
+    var override_props = ['charCode', 'code', 'keyCode', 'which'];
     for (var i = 0; i < override_props.length; i++) {
         var prop_name = override_props[i];
         delete keyboardEvent[prop_name];

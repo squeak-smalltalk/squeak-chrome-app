@@ -12,7 +12,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
   var height = 768;
 
   chrome.app.window.create('index.html', {
-    id: "SqueakJS",
+    id: 'SqueakJS',
     outerBounds: {
       width: width,
       height: height,
