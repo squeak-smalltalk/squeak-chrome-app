@@ -14,6 +14,8 @@ window.addEventListener('load', function(e) {
         } else if (event.data.event == 'copy') {
             CLIPBOARD_BUFFER = event.data;
             document.execCommand('copy');
+        } else if (event.data.event == 'fullscreen') {
+            setFullscreen(event.data.enable);
         }
     });
     var keyboardEventTypes = ['keydown', 'keyup', 'keypress'];
@@ -78,4 +80,13 @@ function clipboardCopyHandler(e) {
         }, '*');
     }
     e.preventDefault();
+}
+
+function setFullscreen(enable) {
+    var win = chrome.app.window.current();
+    if (enable) {
+      win.fullscreen();
+    } else {
+      win.restore();
+    }
 }

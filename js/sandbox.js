@@ -48,6 +48,18 @@ window.onload = function() {
                     }, 500);
                 }
             });
+            SQUEAK_JS_DISPLAY.fullscreenRequest = function(fullscreen, thenDo) {
+                // called from primitive to change fullscreen mode
+                if (SQUEAK_JS_DISPLAY.fullscreen != fullscreen) {
+                    event.source.postMessage({
+                        event: 'fullscreen',
+                        enable: fullscreen,
+                    }, event.origin);
+                    SQUEAK_JS_DISPLAY.fullscreen = fullscreen;
+                    SQUEAK_JS_DISPLAY.resizeTodo = thenDo;    // called after resizing
+                    SQUEAK_JS_DISPLAY.resizeTodoTimeout = setTimeout(SQUEAK_JS_DISPLAY.resizeDone, 1000);
+                } else thenDo();
+            };
         }
     });
 };
