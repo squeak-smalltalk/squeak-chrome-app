@@ -2,7 +2,7 @@ delete window.localStorage;
 window.localStorage = {};
 delete window.indexedDB;
 
-var IMAGE_BASE_URL = 'http://freudenbergs.de/bert/squeakjs/';
+var IMAGE_BASE_URL = 'https://freudenbergs.de/bert/squeakjs/';
 var SQUEAK_JS_DISPLAY = null;
 
 window.onload = function() {
